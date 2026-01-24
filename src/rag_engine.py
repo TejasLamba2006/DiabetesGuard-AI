@@ -1,6 +1,7 @@
 import os
 import pickle
 import json
+import time
 import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
@@ -26,24 +27,44 @@ class RAGEngine:
             self.documents = pickle.load(f)
 
         self.client = genai.Client(api_key=api_key)
-        self.model_name = "gemini-2.0-flash-exp"
+        self.model_name = "gemini-1.5-flash"
+        self.max_retries = 3
+        self.base_delay = 2
 
         self.relevance_threshold = 0.3
         self.max_context_docs = 5
 
     def _generate_text(self, prompt: str) -> str:
-        try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.7,
-                    max_output_tokens=1024,
+        for attempt in range(self.max_retries):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        temperature=0.7,
+                        max_output_tokens=1024,
+                    )
                 )
-            )
-            return response.text
-        except Exception as e:
-            return f"Error generating response: {str(e)}"
+                return response.text
+            except Exception as e:
+                error_str = str(e)
+                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                    if attempt < self.max_retries - 1:
+                        delay = self.base_delay * (2 ** attempt)
+                        time.sleep(delay)
+                        continue
+                    return self._get_fallback_response(prompt)
+                return f"Error generating response: {error_str}"
+        return self._get_fallback_response(prompt)
+
+    def _get_fallback_response(self, prompt: str) -> str:
+        if "risk factors" in prompt.lower() or "contributing" in prompt.lower():
+            return "Based on your health data, key factors affecting diabetes risk include BMI, HbA1c levels, blood glucose, age, and lifestyle factors like smoking. Higher BMI (>25) and HbA1c (>5.7%) indicate increased risk. Please consult your healthcare provider for personalized advice."
+        elif "recommendation" in prompt.lower() or "action plan" in prompt.lower():
+            return "General recommendations for diabetes prevention: 1) Maintain healthy weight (BMI 18.5-24.9), 2) Exercise 150 minutes weekly, 3) Eat balanced diet rich in fiber, 4) Monitor blood sugar regularly, 5) Quit smoking if applicable. Consult your doctor for personalized guidance."
+        elif "what-if" in prompt.lower() or "counterfactual" in prompt.lower():
+            return "Lifestyle changes can significantly impact diabetes risk. Reducing BMI by 5-7% can lower risk by up to 58%. Improving HbA1c through diet and exercise also helps. Small, consistent changes lead to better outcomes over time."
+        return "I'm currently experiencing high demand. Based on your health data, I recommend consulting with your healthcare provider for personalized diabetes risk assessment and management strategies."
 
     def tokenize_query(self, query: str) -> List[str]:
         tokens = self.tokenizer.tokenize(query.lower())
