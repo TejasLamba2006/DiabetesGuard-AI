@@ -9,6 +9,9 @@ from datetime import datetime
 import shap
 import os
 import sys
+from dotenv import load_dotenv
+
+load_dotenv()
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -42,7 +45,7 @@ def load_models():
 @st.cache_resource
 def load_rag_engine():
     api_key = st.secrets.get(
-        "GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
+        "OPENROUTER_API_KEY", os.environ.get("OPENROUTER_API_KEY", ""))
     if not api_key:
         return None
     return create_rag_engine(api_key)
@@ -344,7 +347,7 @@ except Exception as e:
 rag_engine = load_rag_engine()
 if rag_engine is None:
     st.sidebar.warning(
-        "⚠️ Set GEMINI_API_KEY in secrets or environment for AI chat features")
+        "⚠️ Set OPENROUTER_API_KEY in secrets or environment for AI chat features")
 
 with st.sidebar:
     st.markdown("### ⚙️ Settings")
@@ -364,7 +367,7 @@ with st.sidebar:
     - XGBoost for risk prediction
     - SHAP for explainability
     - FAISS + RAG for grounded AI responses
-    - Gemini for natural language
+    - DeepSeek V3 via OpenRouter
     """)
 
     if st.button("🗑️ Clear Chat History"):
@@ -511,7 +514,7 @@ if models_loaded:
 
         if not rag_engine:
             st.warning(
-                "⚠️ Please configure GEMINI_API_KEY to enable chat features")
+                "⚠️ Please configure OPENROUTER_API_KEY to enable chat features")
         else:
             st.markdown("""
             <p style="color: #64748B; margin-bottom: 1rem;">

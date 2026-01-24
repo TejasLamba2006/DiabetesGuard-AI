@@ -6,7 +6,7 @@ import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
-import google.generativeai as genai
+from openai import OpenAI
 from typing import List, Dict, Optional, Tuple
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -25,8 +25,11 @@ class RAGEngine:
         with open(os.path.join(KNOWLEDGE_DIR, "knowledge_documents.pkl"), "rb") as f:
             self.documents = pickle.load(f)
 
-        genai.configure(api_key=api_key)
-        self.llm = genai.GenerativeModel('gemini-1.5-flash')
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key
+        )
+        self.model_name = "deepseek/deepseek-chat-v3-0324:free"
         self.max_retries = 3
         self.base_delay = 2
 
@@ -36,17 +39,16 @@ class RAGEngine:
     def _generate_text(self, prompt: str) -> str:
         for attempt in range(self.max_retries):
             try:
-                response = self.llm.generate_content(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=0.7,
-                        max_output_tokens=1024,
-                    )
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.7,
+                    max_tokens=1024,
                 )
-                return response.text
+                return response.choices[0].message.content
             except Exception as e:
                 error_str = str(e)
-                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower():
+                if "429" in error_str or "rate" in error_str.lower() or "quota" in error_str.lower():
                     if attempt < self.max_retries - 1:
                         delay = self.base_delay * (2 ** attempt)
                         time.sleep(delay)
