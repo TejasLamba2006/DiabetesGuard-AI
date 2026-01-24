@@ -274,10 +274,53 @@ st.markdown("""
     }
     
     .stForm {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        border: 1px solid #E5E7EB;
+        background: linear-gradient(145deg, #ffffff, #f8fafc);
+        padding: 2rem;
+        border-radius: 16px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    .stForm [data-testid="stFormSubmitButton"] > button {
+        background: linear-gradient(135deg, #4F46E5, #7C3AED) !important;
+        color: white !important;
+        border: none !important;
+        padding: 0.75rem 2rem !important;
+        font-weight: 600 !important;
+        border-radius: 10px !important;
+        width: 100%;
+        transition: all 0.2s ease;
+    }
+    
+    .stForm [data-testid="stFormSubmitButton"] > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+    }
+    
+    .stSelectbox > div > div {
+        border-radius: 8px;
+    }
+    
+    .stSlider > div > div > div {
+        background: linear-gradient(90deg, #4F46E5, #7C3AED);
+    }
+    
+    .stNumberInput > div > div > input {
+        border-radius: 8px;
+    }
+    
+    .stCheckbox > label > span {
+        border-radius: 4px;
+    }
+    
+    .stTextInput > div > div > input {
+        border-radius: 8px;
+        border: 1px solid #E2E8F0;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #4F46E5;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
     }
     
     footer {

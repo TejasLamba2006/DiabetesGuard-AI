@@ -6,8 +6,7 @@ import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 from typing import List, Dict, Optional, Tuple
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,8 +25,8 @@ class RAGEngine:
         with open(os.path.join(KNOWLEDGE_DIR, "knowledge_documents.pkl"), "rb") as f:
             self.documents = pickle.load(f)
 
-        self.client = genai.Client(api_key=api_key)
-        self.model_name = "gemini-1.5-flash"
+        genai.configure(api_key=api_key)
+        self.llm = genai.GenerativeModel('gemini-1.5-flash')
         self.max_retries = 3
         self.base_delay = 2
 
@@ -37,10 +36,9 @@ class RAGEngine:
     def _generate_text(self, prompt: str) -> str:
         for attempt in range(self.max_retries):
             try:
-                response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
+                response = self.llm.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
                         temperature=0.7,
                         max_output_tokens=1024,
                     )
@@ -48,7 +46,7 @@ class RAGEngine:
                 return response.text
             except Exception as e:
                 error_str = str(e)
-                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower():
                     if attempt < self.max_retries - 1:
                         delay = self.base_delay * (2 ** attempt)
                         time.sleep(delay)
