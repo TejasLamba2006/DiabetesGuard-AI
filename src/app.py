@@ -595,7 +595,8 @@ if models_loaded:
                                     use_container_width=True)
 
                 with m2:
-                    icon_map = {'low': 'fa-check-circle', 'moderate': 'fa-exclamation-circle', 'high': 'fa-times-circle'}
+                    icon_map = {'low': 'fa-check-circle',
+                                'moderate': 'fa-exclamation-circle', 'high': 'fa-times-circle'}
                     st.markdown(f"""
                     <div class="metric-card" style="text-align: center; margin-top: 2rem;">
                         <div class="risk-badge {emoji}">
@@ -791,7 +792,8 @@ if models_loaded:
                     delta_color="inverse"
                 )
 
-                icon_map2 = {'low': 'fa-check-circle', 'moderate': 'fa-exclamation-circle', 'high': 'fa-times-circle'}
+                icon_map2 = {'low': 'fa-check-circle',
+                             'moderate': 'fa-exclamation-circle', 'high': 'fa-times-circle'}
                 st.markdown(f"""
                 <div class="metric-card">
                     <p><strong>Original:</strong> {original_risk:.1f}% → <strong>New:</strong> {new_risk:.1f}%</p>
