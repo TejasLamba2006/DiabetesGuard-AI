@@ -17,7 +17,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 st.set_page_config(
     page_title="DiabetesGuard AI",
-    page_icon="🩺",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -60,10 +60,10 @@ def encode_value(encoder, value):
 
 def get_risk_category(prob):
     if prob < 0.30:
-        return "Low Risk", "#10B981", "🟢"
+        return "Low Risk", "#10B981", "low"
     elif prob < 0.60:
-        return "Moderate Risk", "#F59E0B", "🟡"
-    return "High Risk", "#EF4444", "🔴"
+        return "Moderate Risk", "#F59E0B", "moderate"
+    return "High Risk", "#EF4444", "high"
 
 
 def create_risk_gauge(probability):
@@ -169,72 +169,139 @@ if 'view_mode' not in st.session_state:
     st.session_state.view_mode = "patient"
 
 st.markdown("""
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
     .stApp {
         font-family: 'Inter', sans-serif;
+        background: #0F172A;
     }
     
     .main-header {
-        background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
-        padding: 2rem;
+        background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+        padding: 2.5rem;
         border-radius: 16px;
         margin-bottom: 2rem;
-        color: white;
+        border: 1px solid #334155;
     }
     
     .main-header h1 {
-        color: white !important;
+        color: #F8FAFC !important;
         margin: 0;
-        font-size: 2.5rem;
+        font-size: 2rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 12px;
     }
     
     .main-header p {
-        color: rgba(255,255,255,0.9) !important;
-        margin: 0.5rem 0 0 0;
+        color: #94A3B8 !important;
+        margin: 0.75rem 0 0 0;
+        font-size: 1rem;
+    }
+    
+    .header-icon {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #4F46E5, #7C3AED);
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
     }
     
     .metric-card {
-        background: white;
+        background: #1E293B;
         padding: 1.5rem;
         border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        border: 1px solid #E5E7EB;
+        border: 1px solid #334155;
         margin: 1rem 0;
     }
     
     .risk-badge {
-        display: inline-block;
-        padding: 0.75rem 2rem;
-        border-radius: 9999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
         font-weight: 600;
-        font-size: 1.25rem;
-        margin: 0.5rem 0;
+        font-size: 1.1rem;
+    }
+    
+    .risk-badge.low {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10B981;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    
+    .risk-badge.moderate {
+        background: rgba(245, 158, 11, 0.15);
+        color: #F59E0B;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    
+    .risk-badge.high {
+        background: rgba(239, 68, 68, 0.15);
+        color: #EF4444;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    
+    .chat-container {
+        background: #1E293B;
+        border-radius: 12px;
+        border: 1px solid #334155;
+        padding: 1.5rem;
+        min-height: 400px;
+        max-height: 500px;
+        overflow-y: auto;
     }
     
     .chat-message {
-        padding: 1rem 1.5rem;
+        padding: 1rem 1.25rem;
         border-radius: 12px;
         margin-bottom: 1rem;
-        line-height: 1.6;
+        line-height: 1.7;
     }
     
     .user-message {
-        background: #EEF2FF;
+        background: #334155;
         margin-left: 2rem;
-        border-left: 4px solid #4F46E5;
+        border-left: 3px solid #4F46E5;
+        color: #F1F5F9;
     }
     
     .assistant-message {
-        background: #F8FAFC;
+        background: #1E293B;
+        border: 1px solid #334155;
         margin-right: 2rem;
-        border-left: 4px solid #10B981;
+        border-left: 3px solid #10B981;
+        color: #E2E8F0;
+    }
+    
+    .message-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .user-message .message-label {
+        color: #94A3B8;
+    }
+    
+    .assistant-message .message-label {
+        color: #10B981;
     }
     
     .section-divider {
         height: 1px;
-        background: linear-gradient(90deg, transparent, #E5E7EB, transparent);
+        background: linear-gradient(90deg, transparent, #334155, transparent);
         margin: 2rem 0;
     }
     
@@ -242,97 +309,167 @@ st.markdown("""
         border-radius: 8px;
         font-weight: 500;
         padding: 0.5rem 1rem;
+        background: #334155;
+        color: #F1F5F9;
+        border: 1px solid #475569;
     }
     
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #4F46E5, #7C3AED);
-        border: none;
+    .stButton > button:hover {
+        background: #475569;
+        border-color: #64748B;
     }
     
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+        gap: 4px;
+        background: #1E293B;
+        padding: 4px;
+        border-radius: 10px;
     }
     
     .stTabs [data-baseweb="tab"] {
-        border-radius: 8px 8px 0 0;
-        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        padding: 0.75rem 1.25rem;
         font-weight: 500;
+        color: #94A3B8;
+        background: transparent;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: #334155 !important;
+        color: #F1F5F9 !important;
     }
     
     div[data-testid="stMetric"] {
-        background: white;
-        padding: 1rem;
+        background: #1E293B;
+        padding: 1.25rem;
         border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border: 1px solid #E5E7EB;
+        border: 1px solid #334155;
     }
     
     div[data-testid="stMetric"] label {
-        color: #64748B !important;
+        color: #94A3B8 !important;
     }
     
     div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-        color: #1E293B !important;
+        color: #F1F5F9 !important;
         font-weight: 600;
     }
     
     .stForm {
-        background: linear-gradient(145deg, #ffffff, #f8fafc);
-        padding: 2rem;
-        border-radius: 16px;
-        border: 1px solid #E2E8F0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        background: #1E293B;
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 1px solid #334155;
     }
     
     .stForm [data-testid="stFormSubmitButton"] > button {
         background: linear-gradient(135deg, #4F46E5, #7C3AED) !important;
         color: white !important;
         border: none !important;
-        padding: 0.75rem 2rem !important;
+        padding: 0.75rem 1.5rem !important;
         font-weight: 600 !important;
-        border-radius: 10px !important;
+        border-radius: 8px !important;
         width: 100%;
         transition: all 0.2s ease;
     }
     
     .stForm [data-testid="stFormSubmitButton"] > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
     }
     
-    .stSelectbox > div > div {
-        border-radius: 8px;
-    }
-    
-    .stSlider > div > div > div {
-        background: linear-gradient(90deg, #4F46E5, #7C3AED);
-    }
-    
-    .stNumberInput > div > div > input {
-        border-radius: 8px;
-    }
-    
-    .stCheckbox > label > span {
-        border-radius: 4px;
-    }
-    
+    .stSelectbox > div > div,
+    .stNumberInput > div > div > input,
     .stTextInput > div > div > input {
+        background: #0F172A !important;
+        border: 1px solid #334155 !important;
         border-radius: 8px;
-        border: 1px solid #E2E8F0;
+        color: #F1F5F9 !important;
     }
     
     .stTextInput > div > div > input:focus {
-        border-color: #4F46E5;
-        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        border-color: #4F46E5 !important;
+        box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+    }
+    
+    .stSlider > div > div > div {
+        background: #334155;
+    }
+    
+    .stSlider > div > div > div > div {
+        background: linear-gradient(90deg, #4F46E5, #7C3AED) !important;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+        color: #F1F5F9 !important;
+    }
+    
+    p, span, label {
+        color: #CBD5E1;
+    }
+    
+    .stMarkdown {
+        color: #CBD5E1;
+    }
+    
+    .stAlert {
+        background: #1E293B;
+        border: 1px solid #334155;
+        border-radius: 8px;
+    }
+    
+    .stInfo {
+        background: rgba(79, 70, 229, 0.1) !important;
+        border: 1px solid rgba(79, 70, 229, 0.3) !important;
+    }
+    
+    .stWarning {
+        background: rgba(245, 158, 11, 0.1) !important;
+        border: 1px solid rgba(245, 158, 11, 0.3) !important;
+    }
+    
+    .stExpander {
+        background: #1E293B;
+        border: 1px solid #334155;
+        border-radius: 8px;
+    }
+    
+    .stDataFrame {
+        background: #1E293B;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #64748B;
+    }
+    
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        color: #475569;
     }
     
     footer {
         text-align: center;
         padding: 2rem;
-        color: #94A3B8;
+        color: #64748B;
         font-size: 0.875rem;
         margin-top: 3rem;
-        border-top: 1px solid #E5E7EB;
+        border-top: 1px solid #334155;
+    }
+    
+    .sidebar .stRadio > label {
+        color: #94A3B8;
+    }
+    
+    section[data-testid="stSidebar"] {
+        background: #1E293B;
+        border-right: 1px solid #334155;
+    }
+    
+    section[data-testid="stSidebar"] .stMarkdown {
+        color: #94A3B8;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -347,10 +484,10 @@ except Exception as e:
 rag_engine = load_rag_engine()
 if rag_engine is None:
     st.sidebar.warning(
-        "⚠️ Set OPENROUTER_API_KEY in secrets or environment for AI chat features")
+        "Set OPENROUTER_API_KEY in secrets or environment for AI chat features")
 
 with st.sidebar:
-    st.markdown("### ⚙️ Settings")
+    st.markdown("### Settings")
 
     view_mode = st.radio(
         "View Mode",
@@ -361,31 +498,29 @@ with st.sidebar:
     st.session_state.view_mode = "patient" if view_mode == "Patient View" else "doctor"
 
     st.markdown("---")
-    st.markdown("### 📊 About")
+    st.markdown("### Technology Stack")
     st.info("""
     **DiabetesGuard AI** uses:
     - XGBoost for risk prediction
     - SHAP for explainability
-    - FAISS + RAG for grounded AI responses
+    - FAISS + RAG for grounded AI
     - DeepSeek V3 via OpenRouter
     """)
 
-    if st.button("🗑️ Clear Chat History"):
+    if st.button("Clear Chat History"):
         st.session_state.chat_history = []
         st.rerun()
 
 st.markdown("""
 <div class="main-header">
-    <h1 style="margin:0; font-size: 2.5rem;">🩺 DiabetesGuard AI</h1>
-    <p style="margin:0.5rem 0 0 0; opacity: 0.9;">
-        AI-Powered Clinical Decision Support with Explainable Risk Assessment
-    </p>
+    <h1><span class="header-icon"><i class="fa-solid fa-heart-pulse"></i></span> DiabetesGuard AI</h1>
+    <p>Clinical Decision Support System with Explainable Risk Assessment</p>
 </div>
 """, unsafe_allow_html=True)
 
 if models_loaded:
     tab1, tab2, tab3, tab4 = st.tabs(
-        ["📋 Risk Assessment", "💬 AI Chat", "🔮 What-If Analysis", "📈 Insights"])
+        ["Risk Assessment", "AI Chat", "What-If Analysis", "Insights"])
 
     with tab1:
         col1, col2 = st.columns([1, 1.5])
@@ -412,7 +547,7 @@ if models_loaded:
                                            "never", "former", "current", "ever", "not current", "unknown"])
 
                 submitted = st.form_submit_button(
-                    "🔍 Analyze Risk", use_container_width=True, type="primary")
+                    "Analyze Risk", use_container_width=True, type="primary")
 
         with col2:
             if submitted:
@@ -460,12 +595,13 @@ if models_loaded:
                                     use_container_width=True)
 
                 with m2:
+                    icon_map = {'low': 'fa-check-circle', 'moderate': 'fa-exclamation-circle', 'high': 'fa-times-circle'}
                     st.markdown(f"""
                     <div class="metric-card" style="text-align: center; margin-top: 2rem;">
-                        <div class="risk-badge" style="background: {color}20; color: {color}; border: 2px solid {color};">
-                            {emoji} {category}
+                        <div class="risk-badge {emoji}">
+                            <i class="fa-solid {icon_map[emoji]}"></i> {category}
                         </div>
-                        <p style="margin-top: 1rem; color: #64748B;">
+                        <p style="margin-top: 1rem; color: #94A3B8;">
                             Based on analysis of 8 clinical parameters
                         </p>
                     </div>
@@ -503,45 +639,49 @@ if models_loaded:
                     st.markdown(explanation)
             else:
                 st.markdown("""
-                <div style="text-align: center; padding: 4rem 2rem; color: #64748B;">
-                    <h3>👈 Enter patient data and click "Analyze Risk"</h3>
-                    <p>Get AI-powered risk assessment with explainable insights</p>
+                <div class="empty-state">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    <h3>Enter patient data and click "Analyze Risk"</h3>
+                    <p>Get risk assessment with explainable insights</p>
                 </div>
                 """, unsafe_allow_html=True)
 
     with tab2:
-        st.markdown("### 💬 Chat with DiabetesGuard AI")
+        st.markdown("### Chat with DiabetesGuard AI")
 
         if not rag_engine:
             st.warning(
-                "⚠️ Please configure OPENROUTER_API_KEY to enable chat features")
+                "Please configure OPENROUTER_API_KEY to enable chat features")
         else:
             st.markdown("""
-            <p style="color: #64748B; margin-bottom: 1rem;">
+            <p style="color: #94A3B8; margin-bottom: 1.5rem;">
             Ask questions about diabetes risk, lifestyle modifications, or your assessment. 
-            AI responses are grounded in our medical knowledge base and dataset.
+            Responses are grounded in our medical knowledge base and dataset.
             </p>
             """, unsafe_allow_html=True)
 
-            chat_container = st.container()
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
 
-            with chat_container:
-                for msg in st.session_state.chat_history:
-                    if msg['role'] == 'user':
-                        st.markdown(f"""
-                        <div class="chat-message user-message">
-                            <strong>You:</strong> {msg['content']}
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                        <div class="chat-message assistant-message">
-                            <strong>🤖 DiabetesGuard:</strong><br>{msg['content']}
-                        </div>
-                        """, unsafe_allow_html=True)
-                        if 'sources' in msg:
-                            with st.expander("📚 Sources"):
-                                st.write(", ".join(msg['sources']))
+            for msg in st.session_state.chat_history:
+                if msg['role'] == 'user':
+                    st.markdown(f"""
+                    <div class="chat-message user-message">
+                        <div class="message-label"><i class="fa-solid fa-user"></i> You</div>
+                        {msg['content']}
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="chat-message assistant-message">
+                        <div class="message-label"><i class="fa-solid fa-robot"></i> DiabetesGuard</div>
+                        {msg['content']}
+                    </div>
+                    """, unsafe_allow_html=True)
+                    if 'sources' in msg and msg['sources']:
+                        with st.expander("Sources"):
+                            st.write(", ".join(msg['sources']))
+
+            st.markdown('</div>', unsafe_allow_html=True)
 
             with st.form("chat_form", clear_on_submit=True):
                 user_input = st.text_input(
@@ -574,9 +714,9 @@ if models_loaded:
                 st.rerun()
 
     with tab3:
-        st.markdown("### 🔮 What-If Analysis")
+        st.markdown("### What-If Analysis")
         st.markdown("""
-        <p style="color: #64748B;">
+        <p style="color: #94A3B8;">
         Explore how changes in your health metrics could impact your diabetes risk.
         </p>
         """, unsafe_allow_html=True)
@@ -651,11 +791,12 @@ if models_loaded:
                     delta_color="inverse"
                 )
 
+                icon_map2 = {'low': 'fa-check-circle', 'moderate': 'fa-exclamation-circle', 'high': 'fa-times-circle'}
                 st.markdown(f"""
                 <div class="metric-card">
                     <p><strong>Original:</strong> {original_risk:.1f}% → <strong>New:</strong> {new_risk:.1f}%</p>
-                    <div class="risk-badge" style="background: {new_color}20; color: {new_color};">
-                        {new_emoji} {new_category}
+                    <div class="risk-badge {new_emoji}">
+                        <i class="fa-solid {icon_map2[new_emoji]}"></i> {new_category}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -666,7 +807,7 @@ if models_loaded:
             if rag_engine:
                 st.markdown("#### AI-Generated Recommendations")
 
-                if st.button("🎯 Generate Personalized Plan"):
+                if st.button("Generate Personalized Plan"):
                     with st.spinner("Creating personalized recommendations..."):
                         modified_context = st.session_state.patient_context.copy()
                         modified_context['target_bmi'] = new_bmi
@@ -678,10 +819,10 @@ if models_loaded:
                     st.markdown(counterfactual)
         else:
             st.info(
-                "👈 Please complete a risk assessment first to use What-If analysis")
+                "Please complete a risk assessment first to use What-If analysis")
 
     with tab4:
-        st.markdown("### 📈 Dataset Insights")
+        st.markdown("### Dataset Insights")
 
         try:
             with open(f"{MODEL_DIR}/dataset_stats.pkl", "rb") as f:
@@ -750,8 +891,8 @@ if models_loaded:
                 "Dataset statistics not found. Please run train_model.py first.")
 
 st.markdown("""
-<div style="text-align: center; padding: 2rem; color: #94A3B8; font-size: 0.875rem; margin-top: 3rem; border-top: 1px solid #E5E7EB;">
+<div style="text-align: center; padding: 2rem; color: #64748B; font-size: 0.875rem; margin-top: 3rem; border-top: 1px solid #334155;">
     <p><strong>DiabetesGuard AI</strong> | Built for GDG Praxis 2.0</p>
-    <p>⚠️ For educational purposes only. Not a diagnostic tool. Consult healthcare professionals.</p>
+    <p><i class="fa-solid fa-triangle-exclamation"></i> For educational purposes only. Not a diagnostic tool. Consult healthcare professionals.</p>
 </div>
 """, unsafe_allow_html=True)

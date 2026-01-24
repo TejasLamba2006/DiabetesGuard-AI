@@ -29,7 +29,7 @@ class RAGEngine:
             base_url="https://openrouter.ai/api/v1",
             api_key=api_key
         )
-        self.model_name = "deepseek/deepseek-chat-v3-0324:free"
+        self.model_name = "deepseek/deepseek-chat-v3.1"
         self.max_retries = 3
         self.base_delay = 2
 
