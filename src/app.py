@@ -1,3 +1,4 @@
+from rag_engine import create_rag_engine
 import streamlit as st
 import pickle
 import numpy as np
@@ -10,7 +11,6 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from rag_engine import create_rag_engine
 
 st.set_page_config(
     page_title="DiabetesGuard AI",
@@ -19,8 +19,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-MODEL_DIR = "models"
-KNOWLEDGE_DIR = "knowledge_base"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_DIR = os.path.join(BASE_DIR, "models")
+KNOWLEDGE_DIR = os.path.join(BASE_DIR, "knowledge_base")
+
 
 @st.cache_resource
 def load_models():
@@ -36,12 +38,15 @@ def load_models():
         feature_cols = pickle.load(f)
     return model, label_encoders, scaler, shap_explainer, feature_cols
 
+
 @st.cache_resource
 def load_rag_engine():
-    api_key = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
+    api_key = st.secrets.get(
+        "GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
     if not api_key:
         return None
     return create_rag_engine(api_key)
+
 
 def encode_value(encoder, value):
     value = str(value).strip().lower()
@@ -49,12 +54,14 @@ def encode_value(encoder, value):
         value = encoder.classes_[0]
     return encoder.transform([value])[0]
 
+
 def get_risk_category(prob):
     if prob < 0.30:
         return "Low Risk", "#10B981", "🟢"
     elif prob < 0.60:
         return "Moderate Risk", "#F59E0B", "🟡"
     return "High Risk", "#EF4444", "🔴"
+
 
 def create_risk_gauge(probability):
     fig = go.Figure(go.Indicator(
@@ -89,11 +96,12 @@ def create_risk_gauge(probability):
     )
     return fig
 
+
 def create_shap_waterfall(shap_values, feature_names, base_value):
     sorted_idx = np.argsort(np.abs(shap_values))[::-1]
-    
+
     fig = go.Figure()
-    
+
     cumulative = base_value
     for i, idx in enumerate(sorted_idx[:6]):
         val = shap_values[idx]
@@ -106,7 +114,7 @@ def create_shap_waterfall(shap_values, feature_names, base_value):
             textposition='outside',
             showlegend=False
         ))
-    
+
     fig.update_layout(
         title="Risk Factor Contributions (SHAP Analysis)",
         xaxis_title="Impact on Risk",
@@ -120,23 +128,24 @@ def create_shap_waterfall(shap_values, feature_names, base_value):
     )
     return fig
 
+
 def create_comparison_chart(patient_values, dataset_means, feature_names):
     fig = go.Figure()
-    
+
     fig.add_trace(go.Bar(
         name='Your Values',
         x=feature_names,
         y=patient_values,
         marker_color='#4F46E5'
     ))
-    
+
     fig.add_trace(go.Bar(
         name='Dataset Average',
         x=feature_names,
         y=dataset_means,
         marker_color='#94A3B8'
     ))
-    
+
     fig.update_layout(
         title="Your Metrics vs Dataset Average",
         barmode='group',
@@ -147,6 +156,7 @@ def create_comparison_chart(patient_values, dataset_means, feature_names):
         yaxis=dict(gridcolor='#E5E7EB')
     )
     return fig
+
 
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
@@ -159,7 +169,9 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
-    * { font-family: 'Inter', sans-serif; }
+    .stApp {
+        font-family: 'Inter', sans-serif;
+    }
     
     .main-header {
         background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
@@ -169,36 +181,52 @@ st.markdown("""
         color: white;
     }
     
+    .main-header h1 {
+        color: white !important;
+        margin: 0;
+        font-size: 2.5rem;
+    }
+    
+    .main-header p {
+        color: rgba(255,255,255,0.9) !important;
+        margin: 0.5rem 0 0 0;
+    }
+    
     .metric-card {
         background: white;
         padding: 1.5rem;
         border-radius: 12px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         border: 1px solid #E5E7EB;
+        margin: 1rem 0;
     }
     
     .risk-badge {
         display: inline-block;
-        padding: 0.5rem 1.5rem;
+        padding: 0.75rem 2rem;
         border-radius: 9999px;
         font-weight: 600;
         font-size: 1.25rem;
+        margin: 0.5rem 0;
     }
     
     .chat-message {
-        padding: 1rem;
+        padding: 1rem 1.5rem;
         border-radius: 12px;
-        margin-bottom: 0.5rem;
+        margin-bottom: 1rem;
+        line-height: 1.6;
     }
     
     .user-message {
         background: #EEF2FF;
         margin-left: 2rem;
+        border-left: 4px solid #4F46E5;
     }
     
     .assistant-message {
-        background: #F3F4F6;
+        background: #F8FAFC;
         margin-right: 2rem;
+        border-left: 4px solid #10B981;
     }
     
     .section-divider {
@@ -207,9 +235,58 @@ st.markdown("""
         margin: 2rem 0;
     }
     
-    .stButton>button {
+    .stButton > button {
         border-radius: 8px;
         font-weight: 500;
+        padding: 0.5rem 1rem;
+    }
+    
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #4F46E5, #7C3AED);
+        border: none;
+    }
+    
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px 8px 0 0;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+    }
+    
+    div[data-testid="stMetric"] {
+        background: white;
+        padding: 1rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border: 1px solid #E5E7EB;
+    }
+    
+    div[data-testid="stMetric"] label {
+        color: #64748B !important;
+    }
+    
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: #1E293B !important;
+        font-weight: 600;
+    }
+    
+    .stForm {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 1px solid #E5E7EB;
+    }
+    
+    footer {
+        text-align: center;
+        padding: 2rem;
+        color: #94A3B8;
+        font-size: 0.875rem;
+        margin-top: 3rem;
+        border-top: 1px solid #E5E7EB;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -223,11 +300,12 @@ except Exception as e:
 
 rag_engine = load_rag_engine()
 if rag_engine is None:
-    st.sidebar.warning("⚠️ Set GEMINI_API_KEY in secrets or environment for AI chat features")
+    st.sidebar.warning(
+        "⚠️ Set GEMINI_API_KEY in secrets or environment for AI chat features")
 
 with st.sidebar:
     st.markdown("### ⚙️ Settings")
-    
+
     view_mode = st.radio(
         "View Mode",
         ["Patient View", "Doctor View"],
@@ -235,7 +313,7 @@ with st.sidebar:
         help="Switch between patient-friendly and clinical views"
     )
     st.session_state.view_mode = "patient" if view_mode == "Patient View" else "doctor"
-    
+
     st.markdown("---")
     st.markdown("### 📊 About")
     st.info("""
@@ -245,7 +323,7 @@ with st.sidebar:
     - FAISS + RAG for grounded AI responses
     - Gemini for natural language
     """)
-    
+
     if st.button("🗑️ Clear Chat History"):
         st.session_state.chat_history = []
         st.rerun()
@@ -260,14 +338,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 if models_loaded:
-    tab1, tab2, tab3, tab4 = st.tabs(["📋 Risk Assessment", "💬 AI Chat", "🔮 What-If Analysis", "📈 Insights"])
-    
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["📋 Risk Assessment", "💬 AI Chat", "🔮 What-If Analysis", "📈 Insights"])
+
     with tab1:
         col1, col2 = st.columns([1, 1.5])
-        
+
         with col1:
             st.markdown("### Patient Information")
-            
+
             with st.form("patient_form"):
                 c1, c2 = st.columns(2)
                 with c1:
@@ -275,15 +354,20 @@ if models_loaded:
                     age = st.number_input("Age", 1, 120, 45)
                     bmi = st.number_input("BMI", 10.0, 60.0, 28.0, 0.1)
                     hba1c = st.number_input("HbA1c (%)", 3.0, 15.0, 6.0, 0.1)
-                
+
                 with c2:
-                    glucose = st.number_input("Blood Glucose (mg/dL)", 50, 400, 120)
-                    hypertension = st.selectbox("Hypertension", [0, 1], format_func=lambda x: "Yes" if x else "No")
-                    heart_disease = st.selectbox("Heart Disease", [0, 1], format_func=lambda x: "Yes" if x else "No")
-                    smoking = st.selectbox("Smoking History", ["never", "former", "current", "ever", "not current", "unknown"])
-                
-                submitted = st.form_submit_button("🔍 Analyze Risk", use_container_width=True, type="primary")
-        
+                    glucose = st.number_input(
+                        "Blood Glucose (mg/dL)", 50, 400, 120)
+                    hypertension = st.selectbox(
+                        "Hypertension", [0, 1], format_func=lambda x: "Yes" if x else "No")
+                    heart_disease = st.selectbox(
+                        "Heart Disease", [0, 1], format_func=lambda x: "Yes" if x else "No")
+                    smoking = st.selectbox("Smoking History", [
+                                           "never", "former", "current", "ever", "not current", "unknown"])
+
+                submitted = st.form_submit_button(
+                    "🔍 Analyze Risk", use_container_width=True, type="primary")
+
         with col2:
             if submitted:
                 features = np.array([[
@@ -291,22 +375,23 @@ if models_loaded:
                     age,
                     hypertension,
                     heart_disease,
-                    encode_value(label_encoders["smoking_history"], smoking.lower()),
+                    encode_value(
+                        label_encoders["smoking_history"], smoking.lower()),
                     bmi,
                     hba1c,
                     glucose
                 ]])
-                
+
                 features_scaled = scaler.transform(features)
                 prob = model.predict_proba(features_scaled)[0][1]
                 category, color, emoji = get_risk_category(prob)
-                
+
                 shap_values = shap_explainer.shap_values(features_scaled)
                 if isinstance(shap_values, list):
                     shap_vals = shap_values[1][0]
                 else:
                     shap_vals = shap_values[0]
-                
+
                 st.session_state.patient_context = {
                     'age': age,
                     'gender': gender,
@@ -320,13 +405,14 @@ if models_loaded:
                     'risk_category': category.lower().replace(" ", "_"),
                     'shap_values': shap_vals
                 }
-                
+
                 st.markdown("### Risk Assessment Results")
-                
+
                 m1, m2 = st.columns(2)
                 with m1:
-                    st.plotly_chart(create_risk_gauge(prob), use_container_width=True)
-                
+                    st.plotly_chart(create_risk_gauge(prob),
+                                    use_container_width=True)
+
                 with m2:
                     st.markdown(f"""
                     <div class="metric-card" style="text-align: center; margin-top: 2rem;">
@@ -338,7 +424,7 @@ if models_loaded:
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
-                    
+
                     if st.session_state.view_mode == "doctor":
                         st.markdown(f"""
                         **Clinical Summary:**
@@ -346,19 +432,22 @@ if models_loaded:
                         - Confidence interval: ±{(prob*(1-prob)*100/len(features))**.5*1.96:.1f}%
                         - Model: XGBoost Classifier
                         """)
-                
-                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-                
-                feature_names = ['Gender', 'Age', 'Hypertension', 'Heart Disease', 
-                               'Smoking', 'BMI', 'HbA1c', 'Glucose']
-                
+
+                st.markdown('<div class="section-divider"></div>',
+                            unsafe_allow_html=True)
+
+                feature_names = ['Gender', 'Age', 'Hypertension', 'Heart Disease',
+                                 'Smoking', 'BMI', 'HbA1c', 'Glucose']
+
                 st.markdown("### Risk Factor Analysis")
-                st.plotly_chart(create_shap_waterfall(shap_vals, feature_names, 0), use_container_width=True)
-                
+                st.plotly_chart(create_shap_waterfall(
+                    shap_vals, feature_names, 0), use_container_width=True)
+
                 if rag_engine:
-                    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+                    st.markdown('<div class="section-divider"></div>',
+                                unsafe_allow_html=True)
                     st.markdown("### AI Explanation")
-                    
+
                     with st.spinner("Generating personalized explanation..."):
                         explanation = rag_engine.explain_risk_factors(
                             st.session_state.patient_context,
@@ -373,12 +462,13 @@ if models_loaded:
                     <p>Get AI-powered risk assessment with explainable insights</p>
                 </div>
                 """, unsafe_allow_html=True)
-    
+
     with tab2:
         st.markdown("### 💬 Chat with DiabetesGuard AI")
-        
+
         if not rag_engine:
-            st.warning("⚠️ Please configure GEMINI_API_KEY to enable chat features")
+            st.warning(
+                "⚠️ Please configure GEMINI_API_KEY to enable chat features")
         else:
             st.markdown("""
             <p style="color: #64748B; margin-bottom: 1rem;">
@@ -386,9 +476,9 @@ if models_loaded:
             AI responses are grounded in our medical knowledge base and dataset.
             </p>
             """, unsafe_allow_html=True)
-            
+
             chat_container = st.container()
-            
+
             with chat_container:
                 for msg in st.session_state.chat_history:
                     if msg['role'] == 'user':
@@ -406,36 +496,37 @@ if models_loaded:
                         if 'sources' in msg:
                             with st.expander("📚 Sources"):
                                 st.write(", ".join(msg['sources']))
-            
+
             with st.form("chat_form", clear_on_submit=True):
                 user_input = st.text_input(
                     "Your question:",
                     placeholder="e.g., Why is my risk score high? What can I do to lower my HbA1c?"
                 )
-                send_btn = st.form_submit_button("Send", use_container_width=True)
-            
+                send_btn = st.form_submit_button(
+                    "Send", use_container_width=True)
+
             if send_btn and user_input:
                 st.session_state.chat_history.append({
                     'role': 'user',
                     'content': user_input
                 })
-                
+
                 with st.spinner("Thinking..."):
                     response = rag_engine.generate_response(
                         user_input,
                         patient_context=st.session_state.patient_context,
                         mode=st.session_state.view_mode
                     )
-                
+
                 st.session_state.chat_history.append({
                     'role': 'assistant',
                     'content': response['response'],
                     'sources': response.get('sources', []),
                     'is_grounded': response.get('is_grounded', False)
                 })
-                
+
                 st.rerun()
-    
+
     with tab3:
         st.markdown("### 🔮 What-If Analysis")
         st.markdown("""
@@ -443,13 +534,13 @@ if models_loaded:
         Explore how changes in your health metrics could impact your diabetes risk.
         </p>
         """, unsafe_allow_html=True)
-        
+
         if st.session_state.patient_context:
             col1, col2 = st.columns(2)
-            
+
             with col1:
                 st.markdown("#### Modify Parameters")
-                
+
                 new_bmi = st.slider(
                     "Target BMI",
                     min_value=18.5,
@@ -457,7 +548,7 @@ if models_loaded:
                     value=float(st.session_state.patient_context['bmi']),
                     step=0.5
                 )
-                
+
                 new_hba1c = st.slider(
                     "Target HbA1c (%)",
                     min_value=4.0,
@@ -465,7 +556,7 @@ if models_loaded:
                     value=float(st.session_state.patient_context['hba1c']),
                     step=0.1
                 )
-                
+
                 new_glucose = st.slider(
                     "Target Blood Glucose (mg/dL)",
                     min_value=70,
@@ -473,7 +564,7 @@ if models_loaded:
                     value=int(st.session_state.patient_context['glucose']),
                     step=5
                 )
-                
+
                 new_smoking = st.selectbox(
                     "Smoking Status",
                     ["never", "former", "current"],
@@ -481,36 +572,39 @@ if models_loaded:
                         st.session_state.patient_context['smoking']
                     ) if st.session_state.patient_context['smoking'] in ["never", "former", "current"] else 0
                 )
-            
+
             with col2:
                 st.markdown("#### Predicted Impact")
-                
+
                 new_features = np.array([[
-                    encode_value(label_encoders["gender"], st.session_state.patient_context['gender'].lower()),
+                    encode_value(
+                        label_encoders["gender"], st.session_state.patient_context['gender'].lower()),
                     st.session_state.patient_context['age'],
                     st.session_state.patient_context['hypertension'],
                     st.session_state.patient_context['heart_disease'],
-                    encode_value(label_encoders["smoking_history"], new_smoking.lower()),
+                    encode_value(
+                        label_encoders["smoking_history"], new_smoking.lower()),
                     new_bmi,
                     new_hba1c,
                     new_glucose
                 ]])
-                
+
                 new_features_scaled = scaler.transform(new_features)
                 new_prob = model.predict_proba(new_features_scaled)[0][1]
-                new_category, new_color, new_emoji = get_risk_category(new_prob)
-                
+                new_category, new_color, new_emoji = get_risk_category(
+                    new_prob)
+
                 original_risk = st.session_state.patient_context['risk_score']
                 new_risk = new_prob * 100
                 risk_change = new_risk - original_risk
-                
+
                 st.metric(
                     "New Risk Score",
                     f"{new_risk:.1f}%",
                     f"{risk_change:+.1f}%",
                     delta_color="inverse"
                 )
-                
+
                 st.markdown(f"""
                 <div class="metric-card">
                     <p><strong>Original:</strong> {original_risk:.1f}% → <strong>New:</strong> {new_risk:.1f}%</p>
@@ -519,44 +613,49 @@ if models_loaded:
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-            
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-            
+
+            st.markdown('<div class="section-divider"></div>',
+                        unsafe_allow_html=True)
+
             if rag_engine:
                 st.markdown("#### AI-Generated Recommendations")
-                
+
                 if st.button("🎯 Generate Personalized Plan"):
                     with st.spinner("Creating personalized recommendations..."):
                         modified_context = st.session_state.patient_context.copy()
                         modified_context['target_bmi'] = new_bmi
                         modified_context['target_hba1c'] = new_hba1c
                         modified_context['target_glucose'] = new_glucose
-                        
-                        counterfactual = rag_engine.generate_counterfactual(modified_context)
+
+                        counterfactual = rag_engine.generate_counterfactual(
+                            modified_context)
                     st.markdown(counterfactual)
         else:
-            st.info("👈 Please complete a risk assessment first to use What-If analysis")
-    
+            st.info(
+                "👈 Please complete a risk assessment first to use What-If analysis")
+
     with tab4:
         st.markdown("### 📈 Dataset Insights")
-        
+
         try:
             with open(f"{MODEL_DIR}/dataset_stats.pkl", "rb") as f:
                 stats = pickle.load(f)
-            
+
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("Total Samples", f"{stats['total_samples']:,}")
             m2.metric("Diabetic Cases", f"{stats['diabetic_samples']:,}")
             m3.metric("Non-Diabetic", f"{stats['non_diabetic_samples']:,}")
-            m4.metric("Diabetes Rate", f"{stats['diabetic_samples']/stats['total_samples']*100:.1f}%")
-            
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-            
+            m4.metric(
+                "Diabetes Rate", f"{stats['diabetic_samples']/stats['total_samples']*100:.1f}%")
+
+            st.markdown('<div class="section-divider"></div>',
+                        unsafe_allow_html=True)
+
             col1, col2 = st.columns(2)
-            
+
             with col1:
                 st.markdown("#### Feature Distributions")
-                
+
                 feature_data = []
                 for feat, vals in stats['feature_ranges'].items():
                     feature_data.append({
@@ -565,42 +664,44 @@ if models_loaded:
                         'Max': vals['max'],
                         'Mean': vals['mean']
                     })
-                
+
                 df = pd.DataFrame(feature_data)
                 st.dataframe(df, use_container_width=True)
-            
+
             with col2:
                 st.markdown("#### Categories")
-                
+
                 st.write("**Gender:**", ", ".join(stats['gender_categories']))
-                st.write("**Smoking History:**", ", ".join(stats['smoking_categories']))
-                
+                st.write("**Smoking History:**",
+                         ", ".join(stats['smoking_categories']))
+
                 if st.session_state.patient_context:
                     st.markdown("#### Your Values vs Average")
-                    
+
                     patient_vals = [
                         st.session_state.patient_context['age'],
                         st.session_state.patient_context['bmi'],
                         st.session_state.patient_context['hba1c'],
                         st.session_state.patient_context['glucose']
                     ]
-                    
+
                     dataset_means = [
                         stats['feature_ranges']['age']['mean'],
                         stats['feature_ranges']['bmi']['mean'],
                         stats['feature_ranges']['HbA1c_level']['mean'],
                         stats['feature_ranges']['blood_glucose_level']['mean']
                     ]
-                    
+
                     fig = create_comparison_chart(
                         patient_vals,
                         dataset_means,
                         ['Age', 'BMI', 'HbA1c', 'Glucose']
                     )
                     st.plotly_chart(fig, use_container_width=True)
-        
+
         except FileNotFoundError:
-            st.warning("Dataset statistics not found. Please run train_model.py first.")
+            st.warning(
+                "Dataset statistics not found. Please run train_model.py first.")
 
 st.markdown("""
 <div style="text-align: center; padding: 2rem; color: #94A3B8; font-size: 0.875rem; margin-top: 3rem; border-top: 1px solid #E5E7EB;">

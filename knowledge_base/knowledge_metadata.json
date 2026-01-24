@@ -1,0 +1,18 @@
+{
+  "total_documents": 27,
+  "medical_guidelines": 18,
+  "dataset_insights": 9,
+  "embedding_dimension": 384,
+  "encoder_model": "all-MiniLM-L6-v2",
+  "categories": [
+    "treatment",
+    "demographics",
+    "comorbidities",
+    "interventions",
+    "biomarkers",
+    "risk_factors",
+    "general",
+    "clinical_guidelines",
+    "dataset"
+  ]
+}

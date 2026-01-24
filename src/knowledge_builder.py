@@ -103,42 +103,43 @@ MEDICAL_KNOWLEDGE = [
     }
 ]
 
+
 def generate_dataset_insights(df):
     insights = []
-    
+
     diabetic = df[df['diabetes'] == 1]
     non_diabetic = df[df['diabetes'] == 0]
-    
+
     insights.append({
         "topic": "dataset_overview",
         "content": f"Our diabetes dataset contains {len(df)} patient records with {len(diabetic)} diabetic cases ({len(diabetic)/len(df)*100:.1f}%) and {len(non_diabetic)} non-diabetic cases ({len(non_diabetic)/len(df)*100:.1f}%). This data is used for risk prediction and analysis.",
         "category": "dataset"
     })
-    
+
     insights.append({
         "topic": "age_distribution",
         "content": f"In our dataset, patient ages range from {df['age'].min()} to {df['age'].max()} years with mean age of {df['age'].mean():.1f} years. Diabetic patients have mean age of {diabetic['age'].mean():.1f} years compared to {non_diabetic['age'].mean():.1f} for non-diabetic patients.",
         "category": "dataset"
     })
-    
+
     insights.append({
         "topic": "bmi_statistics",
         "content": f"BMI in our dataset ranges from {df['bmi'].min():.1f} to {df['bmi'].max():.1f} with mean of {df['bmi'].mean():.1f}. Diabetic patients have mean BMI of {diabetic['bmi'].mean():.1f} compared to {non_diabetic['bmi'].mean():.1f} for non-diabetic, showing higher BMI correlates with diabetes.",
         "category": "dataset"
     })
-    
+
     insights.append({
         "topic": "hba1c_statistics",
         "content": f"HbA1c levels in our dataset range from {df['HbA1c_level'].min():.1f}% to {df['HbA1c_level'].max():.1f}% with mean of {df['HbA1c_level'].mean():.2f}%. Diabetic patients show mean HbA1c of {diabetic['HbA1c_level'].mean():.2f}% versus {non_diabetic['HbA1c_level'].mean():.2f}% for non-diabetic.",
         "category": "dataset"
     })
-    
+
     insights.append({
         "topic": "glucose_statistics",
         "content": f"Blood glucose levels range from {df['blood_glucose_level'].min()} to {df['blood_glucose_level'].max()} mg/dL with mean of {df['blood_glucose_level'].mean():.1f} mg/dL. Diabetic patients average {diabetic['blood_glucose_level'].mean():.1f} mg/dL compared to {non_diabetic['blood_glucose_level'].mean():.1f} mg/dL for non-diabetic.",
         "category": "dataset"
     })
-    
+
     hyp_diabetic = diabetic['hypertension'].mean() * 100
     hyp_non_diabetic = non_diabetic['hypertension'].mean() * 100
     insights.append({
@@ -146,7 +147,7 @@ def generate_dataset_insights(df):
         "content": f"In our dataset, {hyp_diabetic:.1f}% of diabetic patients have hypertension compared to {hyp_non_diabetic:.1f}% of non-diabetic patients. This confirms the strong correlation between hypertension and diabetes risk.",
         "category": "dataset"
     })
-    
+
     hd_diabetic = diabetic['heart_disease'].mean() * 100
     hd_non_diabetic = non_diabetic['heart_disease'].mean() * 100
     insights.append({
@@ -154,55 +155,58 @@ def generate_dataset_insights(df):
         "content": f"Heart disease is present in {hd_diabetic:.1f}% of diabetic patients versus {hd_non_diabetic:.1f}% of non-diabetic patients in our dataset, demonstrating the cardiovascular-diabetes connection.",
         "category": "dataset"
     })
-    
+
     smoking_stats = df.groupby('smoking_history')['diabetes'].mean() * 100
-    smoking_text = ", ".join([f"{cat}: {val:.1f}% diabetes rate" for cat, val in smoking_stats.items()])
+    smoking_text = ", ".join(
+        [f"{cat}: {val:.1f}% diabetes rate" for cat, val in smoking_stats.items()])
     insights.append({
         "topic": "smoking_correlation",
         "content": f"Smoking history and diabetes rates in our dataset: {smoking_text}. Current and former smokers show elevated diabetes risk.",
         "category": "dataset"
     })
-    
+
     gender_stats = df.groupby('gender')['diabetes'].mean() * 100
-    gender_text = ", ".join([f"{g}: {v:.1f}% diabetes rate" for g, v in gender_stats.items()])
+    gender_text = ", ".join(
+        [f"{g}: {v:.1f}% diabetes rate" for g, v in gender_stats.items()])
     insights.append({
         "topic": "gender_distribution",
         "content": f"Gender distribution in our dataset shows: {gender_text}. Our model accounts for gender differences in diabetes risk assessment.",
         "category": "dataset"
     })
-    
+
     return insights
+
 
 def build_knowledge_base():
     print("Loading dataset for insights...")
     df = pd.read_csv(DATA_PATH)
-    
+
     print("Generating dataset insights...")
     dataset_insights = generate_dataset_insights(df)
-    
+
     all_knowledge = MEDICAL_KNOWLEDGE + dataset_insights
-    
+
     print("Loading sentence transformer model...")
     encoder = SentenceTransformer('all-MiniLM-L6-v2')
-    
+
     print("Encoding knowledge documents...")
     documents = [item['content'] for item in all_knowledge]
     embeddings = encoder.encode(documents, show_progress_bar=True)
     embeddings = embeddings.astype('float32')
-    
+
     print("Building FAISS index...")
     dimension = embeddings.shape[1]
     index = faiss.IndexFlatIP(dimension)
     faiss.normalize_L2(embeddings)
     index.add(embeddings)
-    
+
     os.makedirs(KNOWLEDGE_DIR, exist_ok=True)
-    
+
     faiss.write_index(index, f"{KNOWLEDGE_DIR}/knowledge_index.faiss")
-    
+
     with open(f"{KNOWLEDGE_DIR}/knowledge_documents.pkl", "wb") as f:
         pickle.dump(all_knowledge, f)
-    
+
     with open(f"{KNOWLEDGE_DIR}/knowledge_metadata.json", "w") as f:
         metadata = {
             "total_documents": len(all_knowledge),
@@ -213,14 +217,15 @@ def build_knowledge_base():
             "categories": list(set([item['category'] for item in all_knowledge]))
         }
         json.dump(metadata, f, indent=2)
-    
+
     print(f"\nKnowledge base built successfully!")
     print(f"Total documents: {len(all_knowledge)}")
     print(f"Medical guidelines: {len(MEDICAL_KNOWLEDGE)}")
     print(f"Dataset insights: {len(dataset_insights)}")
     print(f"Files saved in: {KNOWLEDGE_DIR}")
-    
+
     return index, all_knowledge, encoder
+
 
 if __name__ == "__main__":
     build_knowledge_base()

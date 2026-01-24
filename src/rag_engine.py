@@ -5,48 +5,66 @@ import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from typing import List, Dict, Optional, Tuple
 
-KNOWLEDGE_DIR = "../knowledge_base"
-MODEL_DIR = "../models"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+KNOWLEDGE_DIR = os.path.join(BASE_DIR, "knowledge_base")
+MODEL_DIR = os.path.join(BASE_DIR, "models")
+
 
 class RAGEngine:
     def __init__(self, api_key: str):
         self.encoder = SentenceTransformer('all-MiniLM-L6-v2')
         self.tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
-        
-        self.index = faiss.read_index(f"{KNOWLEDGE_DIR}/knowledge_index.faiss")
-        
-        with open(f"{KNOWLEDGE_DIR}/knowledge_documents.pkl", "rb") as f:
+
+        self.index = faiss.read_index(
+            os.path.join(KNOWLEDGE_DIR, "knowledge_index.faiss"))
+
+        with open(os.path.join(KNOWLEDGE_DIR, "knowledge_documents.pkl"), "rb") as f:
             self.documents = pickle.load(f)
-        
-        genai.configure(api_key=api_key)
-        self.llm = genai.GenerativeModel('gemini-1.5-flash')
-        
+
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = "gemini-2.0-flash-exp"
+
         self.relevance_threshold = 0.3
         self.max_context_docs = 5
-        
+
+    def _generate_text(self, prompt: str) -> str:
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.7,
+                    max_output_tokens=1024,
+                )
+            )
+            return response.text
+        except Exception as e:
+            return f"Error generating response: {str(e)}"
+
     def tokenize_query(self, query: str) -> List[str]:
         tokens = self.tokenizer.tokenize(query.lower())
         return tokens
-    
+
     def retrieve_context(self, query: str, top_k: int = 5) -> List[Dict]:
         query_embedding = self.encoder.encode([query])
         query_embedding = query_embedding.astype('float32')
         faiss.normalize_L2(query_embedding)
-        
+
         scores, indices = self.index.search(query_embedding, top_k)
-        
+
         relevant_docs = []
         for score, idx in zip(scores[0], indices[0]):
             if score >= self.relevance_threshold:
                 doc = self.documents[idx].copy()
                 doc['relevance_score'] = float(score)
                 relevant_docs.append(doc)
-        
+
         return relevant_docs
-    
+
     def is_query_relevant(self, query: str) -> Tuple[bool, float]:
         diabetes_keywords = [
             'diabetes', 'diabetic', 'blood sugar', 'glucose', 'hba1c', 'a1c',
@@ -57,28 +75,30 @@ class RAGEngine:
             'prediabetes', 'prevention', 'symptom', 'diagnosis', 'screening',
             'cholesterol', 'metabolic', 'pancreas', 'hormone'
         ]
-        
+
         tokens = self.tokenize_query(query)
         query_lower = query.lower()
-        
-        keyword_matches = sum(1 for kw in diabetes_keywords if kw in query_lower)
+
+        keyword_matches = sum(
+            1 for kw in diabetes_keywords if kw in query_lower)
         keyword_score = min(keyword_matches / 3, 1.0)
-        
+
         relevant_docs = self.retrieve_context(query, top_k=3)
         if relevant_docs:
-            semantic_score = max(doc['relevance_score'] for doc in relevant_docs)
+            semantic_score = max(doc['relevance_score']
+                                 for doc in relevant_docs)
         else:
             semantic_score = 0.0
-        
+
         combined_score = 0.4 * keyword_score + 0.6 * semantic_score
         is_relevant = combined_score >= 0.25
-        
+
         return is_relevant, combined_score
-    
-    def generate_response(self, query: str, patient_context: Optional[Dict] = None, 
-                         mode: str = "patient") -> Dict:
+
+    def generate_response(self, query: str, patient_context: Optional[Dict] = None,
+                          mode: str = "patient") -> Dict:
         is_relevant, relevance_score = self.is_query_relevant(query)
-        
+
         if not is_relevant:
             return {
                 "response": "I can only answer questions related to diabetes, health risk factors, and the clinical data in our system. Please ask about diabetes risk, blood sugar, HbA1c, BMI, lifestyle factors, or related health topics.",
@@ -86,9 +106,10 @@ class RAGEngine:
                 "is_grounded": False,
                 "relevance_score": relevance_score
             }
-        
-        relevant_docs = self.retrieve_context(query, top_k=self.max_context_docs)
-        
+
+        relevant_docs = self.retrieve_context(
+            query, top_k=self.max_context_docs)
+
         if not relevant_docs:
             return {
                 "response": "I don't have enough information in my knowledge base to answer this question accurately. Please ask about topics covered in our diabetes dataset and medical guidelines.",
@@ -96,12 +117,12 @@ class RAGEngine:
                 "is_grounded": False,
                 "relevance_score": relevance_score
             }
-        
+
         context_text = "\n\n".join([
-            f"[Source: {doc['topic']}]\n{doc['content']}" 
+            f"[Source: {doc['topic']}]\n{doc['content']}"
             for doc in relevant_docs
         ])
-        
+
         patient_info = ""
         if patient_context:
             patient_info = f"""
@@ -142,11 +163,7 @@ USER QUESTION: {query}
 
 Provide a helpful, accurate response based ONLY on the context provided above. If you cannot answer from the context, clearly state that."""
 
-        try:
-            response = self.llm.generate_content(prompt)
-            response_text = response.text
-        except Exception as e:
-            response_text = f"I encountered an error generating a response. Please try again. Error: {str(e)}"
+        response_text = self._generate_text(prompt)
 
         return {
             "response": response_text,
@@ -155,24 +172,26 @@ Provide a helpful, accurate response based ONLY on the context provided above. I
             "relevance_score": relevance_score,
             "sources": [doc['topic'] for doc in relevant_docs]
         }
-    
+
     def explain_risk_factors(self, patient_context: Dict, shap_values: Optional[np.ndarray] = None,
-                            mode: str = "patient") -> str:
-        relevant_docs = self.retrieve_context("diabetes risk factors explanation", top_k=4)
+                             mode: str = "patient") -> str:
+        relevant_docs = self.retrieve_context(
+            "diabetes risk factors explanation", top_k=4)
         context_text = "\n\n".join([doc['content'] for doc in relevant_docs])
-        
-        feature_names = ['Gender', 'Age', 'Hypertension', 'Heart Disease', 
-                        'Smoking History', 'BMI', 'HbA1c', 'Blood Glucose']
-        
+
+        feature_names = ['Gender', 'Age', 'Hypertension', 'Heart Disease',
+                         'Smoking History', 'BMI', 'HbA1c', 'Blood Glucose']
+
         shap_info = ""
         if shap_values is not None:
             sorted_indices = np.argsort(np.abs(shap_values))[::-1]
-            top_factors = [(feature_names[i], shap_values[i]) for i in sorted_indices[:4]]
+            top_factors = [(feature_names[i], shap_values[i])
+                           for i in sorted_indices[:4]]
             shap_info = "Key contributing factors (from model analysis):\n"
             for feat, val in top_factors:
                 direction = "increases" if val > 0 else "decreases"
                 shap_info += f"- {feat}: {direction} risk (impact: {abs(val):.3f})\n"
-        
+
         if mode == "doctor":
             prompt = f"""As a clinical decision support system, explain this patient's diabetes risk factors.
 
@@ -213,19 +232,16 @@ YOUR HEALTH DATA:
 
 Explain in friendly, simple language what factors contribute to their risk and what they can do about it. Be encouraging and positive."""
 
-        try:
-            response = self.llm.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            return f"Unable to generate explanation: {str(e)}"
+        return self._generate_text(prompt)
 
     def generate_counterfactual(self, patient_context: Dict, target_reduction: float = 0.2) -> str:
-        relevant_docs = self.retrieve_context("diabetes lifestyle intervention weight loss exercise", top_k=3)
+        relevant_docs = self.retrieve_context(
+            "diabetes lifestyle intervention weight loss exercise", top_k=3)
         context_text = "\n\n".join([doc['content'] for doc in relevant_docs])
-        
+
         current_risk = patient_context.get('risk_score', 50)
         target_risk = max(10, current_risk * (1 - target_reduction))
-        
+
         prompt = f"""Based on the medical context below, suggest specific, achievable changes this patient could make to reduce their diabetes risk.
 
 MEDICAL CONTEXT:
@@ -247,18 +263,14 @@ Provide specific, actionable "what-if" scenarios. For example:
 
 Be specific with numbers and timeframes. Base recommendations ONLY on the medical context provided."""
 
-        try:
-            response = self.llm.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            return f"Unable to generate counterfactual analysis: {str(e)}"
+        return self._generate_text(prompt)
 
     def get_recommendations(self, patient_context: Dict, mode: str = "patient") -> str:
         risk_level = patient_context.get('risk_category', 'moderate')
         query = f"diabetes {risk_level} risk recommendations treatment lifestyle"
         relevant_docs = self.retrieve_context(query, top_k=4)
         context_text = "\n\n".join([doc['content'] for doc in relevant_docs])
-        
+
         if mode == "doctor":
             prompt = f"""Generate clinical recommendations for this patient.
 
@@ -298,11 +310,7 @@ Provide a simple, encouraging action plan with:
 
 Keep it positive and achievable. Use simple language."""
 
-        try:
-            response = self.llm.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            return f"Unable to generate recommendations: {str(e)}"
+        return self._generate_text(prompt)
 
 
 def create_rag_engine(api_key: str) -> RAGEngine:
